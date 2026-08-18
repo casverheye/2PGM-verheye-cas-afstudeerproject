@@ -1,0 +1,43 @@
+# Local docs / planning notes (keep offline)
+docs/
+**/docs/
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+werkstuk/code/frontend/node_modules/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+**/\.env
+**/.env.local
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Python tooling
+.mypy_cache/
+.ruff_cache/
