@@ -21,6 +21,8 @@ __pycache__/
 
 # Build outputs
 dist/
+dist-ssr/
+*.local
 build/
 *.egg-info/
 .coverage
@@ -31,6 +33,7 @@ htmlcov/
 Thumbs.db
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 
