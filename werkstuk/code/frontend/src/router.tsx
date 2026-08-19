@@ -5,19 +5,43 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
+import { useAuth } from "./lib/AuthProvider";
+import { RegisterPage } from "./pages/Register";
+import { LoginPage } from "./pages/Login";
+import { DashboardPage } from "./pages/Dashboard";
 
-const rootRoute = createRootRoute({
-  component: () => (
+function RootLayout() {
+  const { user, loading, signOut } = useAuth();
+
+  return (
     <>
-      <nav className="flex gap-4 p-4">
+      <nav className="flex flex-wrap gap-4 p-4">
         <Link to="/">Home</Link>
-        <Link to="/login">Login</Link>
-        <Link to="/register">Register</Link>
         <Link to="/dashboard">Dashboard</Link>
+        <Link to="/learn/$topicId" params={{ topicId: "addition" }}>
+          Learn
+        </Link>
+        {loading ? null : user ? (
+          <>
+            <span>{user.email}</span>
+            <button type="button" onClick={() => void signOut()}>
+              Log out
+            </button>
+          </>
+        ) : (
+          <>
+            <Link to="/login">Login</Link>
+            <Link to="/register">Register</Link>
+          </>
+        )}
       </nav>
       <Outlet />
     </>
-  ),
+  );
+}
+
+const rootRoute = createRootRoute({
+  component: RootLayout,
 });
 
 const indexRoute = createRoute({
@@ -29,26 +53,38 @@ const indexRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
-  component: () => <h1 className="p-4 text-xl">Login</h1>,
+  component: LoginPage,
 });
 
 const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/register",
-  component: () => <h1 className="p-4 text-xl">Register</h1>,
+  component: RegisterPage,
 });
 
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard",
-  component: () => <h1 className="p-4 text-xl">Dashboard</h1>,
+  component: DashboardPage,
 });
+
+const learnRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/learn/$topicId",
+  component: LearnPage,
+});
+
+function LearnPage() {
+  const { topicId } = learnRoute.useParams();
+  return <h1 className="p-4 text-xl">Learn: {topicId}</h1>;
+}
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   registerRoute,
   dashboardRoute,
+  learnRoute,
 ]);
 
 export const router = createRouter({ routeTree });
