@@ -1,7 +1,9 @@
 import { useState, type SubmitEvent } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "../lib/supabase";
 
 export function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -20,7 +22,7 @@ export function LoginPage() {
       return;
     }
 
-    setMessage("Logged in.");
+    void navigate({ to: "/dashboard" });
   }
 
   return (

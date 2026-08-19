@@ -9,6 +9,7 @@ import { useAuth } from "./lib/AuthProvider";
 import { RegisterPage } from "./pages/Register";
 import { LoginPage } from "./pages/Login";
 import { DashboardPage } from "./pages/Dashboard";
+import { LearnPage } from "./pages/Learn";
 
 function RootLayout() {
   const { user, loading, signOut } = useAuth();
@@ -17,12 +18,12 @@ function RootLayout() {
     <>
       <nav className="flex flex-wrap gap-4 p-4">
         <Link to="/">Home</Link>
-        <Link to="/dashboard">Dashboard</Link>
-        <Link to="/learn/$topicId" params={{ topicId: "addition" }}>
-          Learn
-        </Link>
         {loading ? null : user ? (
           <>
+            <Link to="/dashboard">Dashboard</Link>
+            <Link to="/learn/$topicId" params={{ topicId: "addition" }}>
+              Learn
+            </Link>
             <span>{user.email}</span>
             <button type="button" onClick={() => void signOut()}>
               Log out
@@ -73,11 +74,6 @@ const learnRoute = createRoute({
   path: "/learn/$topicId",
   component: LearnPage,
 });
-
-function LearnPage() {
-  const { topicId } = learnRoute.useParams();
-  return <h1 className="p-4 text-xl">Learn: {topicId}</h1>;
-}
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
