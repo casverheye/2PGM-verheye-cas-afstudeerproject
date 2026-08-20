@@ -1,5 +1,5 @@
 import { useEffect, useState, type SubmitEvent } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { RequireAuth } from "../lib/RequireAuth";
 import { supabase } from "../lib/supabase";
 
@@ -24,15 +24,18 @@ export function LearnPage() {
 }
 
 function LearnContent({ topicId }: { topicId: string }) {
+  const navigate = useNavigate();
   const [message, setMessage] = useState("Loading problem…");
   const [problem, setProblem] = useState<Problem | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState("");
+  const [taskDone, setTaskDone] = useState(false);
 
   function loadProblem() {
     const apiUrl = import.meta.env.VITE_API_URL as string;
     setSelected(null);
     setResult("");
+    setTaskDone(false);
     setMessage("Loading problem…");
 
     void supabase.auth
@@ -64,6 +67,14 @@ function LearnContent({ topicId }: { topicId: string }) {
   useEffect(() => {
     loadProblem();
   }, [topicId]);
+
+  function onContinue() {
+    if (taskDone) {
+      void navigate({ to: "/learn" });
+      return;
+    }
+    loadProblem();
+  }
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -103,6 +114,7 @@ function LearnContent({ topicId }: { topicId: string }) {
           next_review_at: string | null;
         };
         const streak = `${body.consecutive_correct}/2 in a row`;
+        setTaskDone(body.status === "completed");
         if (body.is_correct) {
           if (body.status === "completed") {
             const when = body.next_review_at ?? "later";
@@ -201,7 +213,7 @@ function LearnContent({ topicId }: { topicId: string }) {
       {result ? <p>{result}</p> : null}
       {result ? (
         <p>
-          <button type="button" className="border p-2" onClick={loadProblem}>
+          <button type="button" className="border p-2" onClick={onContinue}>
             Continue
           </button>
         </p>
