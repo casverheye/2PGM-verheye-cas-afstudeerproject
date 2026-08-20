@@ -9,6 +9,7 @@ import { useAuth } from "./lib/AuthProvider";
 import { RegisterPage } from "./pages/Register";
 import { LoginPage } from "./pages/Login";
 import { DashboardPage } from "./pages/Dashboard";
+import { LearnHomePage } from "./pages/LearnHome";
 import { LearnPage } from "./pages/Learn";
 
 function RootLayout() {
@@ -21,9 +22,7 @@ function RootLayout() {
         {loading ? null : user ? (
           <>
             <Link to="/dashboard">Dashboard</Link>
-            <Link to="/learn/$topicId" params={{ topicId: "addition" }}>
-              Learn
-            </Link>
+            <Link to="/learn">Learn</Link>
             <span>{user.email}</span>
             <button type="button" onClick={() => void signOut()}>
               Log out
@@ -69,6 +68,12 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 });
 
+const learnHomeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/learn",
+  component: LearnHomePage,
+});
+
 const learnRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/learn/$topicId",
@@ -80,6 +85,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
   dashboardRoute,
+  learnHomeRoute,
   learnRoute,
 ]);
 
