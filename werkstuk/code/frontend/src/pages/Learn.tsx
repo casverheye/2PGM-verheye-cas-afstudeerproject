@@ -88,11 +88,18 @@ function LearnContent({ topicId }: { topicId: string }) {
         const body = (await response.json()) as {
           is_correct: boolean;
           correct_choice: string;
+          consecutive_correct: number;
+          status: string;
         };
+        const streak = `${body.consecutive_correct}/2 in a row`;
         if (body.is_correct) {
-          setResult("Correct");
+          if (body.status === "completed") {
+            setResult(`Correct. Skill completed (${streak})`);
+          } else {
+            setResult(`Correct. ${streak}`);
+          }
         } else {
-          setResult(`Wrong. The answer is ${body.correct_choice}`);
+          setResult(`Wrong. The answer is ${body.correct_choice}. ${streak}`);
         }
       });
     });

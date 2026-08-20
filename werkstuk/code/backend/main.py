@@ -101,7 +101,7 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
 
     problem_rows = (
         db.table("problems")
-        .select("id, correct_choice")
+        .select("id, correct_choice, knowledge_point_id")
         .eq("id", body.problem_id)
         .limit(1)
         .execute()
@@ -109,7 +109,9 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
     if not problem_rows.data:
         raise HTTPException(status_code=404, detail="Problem not found")
 
-    correct_choice = problem_rows.data[0]["correct_choice"]
+    problem = problem_rows.data[0]
+    correct_choice = problem["correct_choice"]
+    kp_id = problem["knowledge_point_id"]
     is_correct = body.chosen_choice == correct_choice
 
     db.table("answer_history").insert(
@@ -121,7 +123,44 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
         }
     ).execute()
 
+    progress_rows = (
+        db.table("user_progress")
+        .select("consecutive_correct")
+        .eq("user_id", user.id)
+        .eq("knowledge_point_id", kp_id)
+        .limit(1)
+        .execute()
+    )
+    old_streak = 0
+    if progress_rows.data:
+        old_streak = progress_rows.data[0]["consecutive_correct"]
+
+    if is_correct:
+        new_streak = old_streak + 1
+    else:
+        new_streak = 0
+
+    if new_streak >= 2:
+        status = "completed"
+    else:
+        status = "in_progress"
+
+    progress = {
+        "user_id": user.id,
+        "knowledge_point_id": kp_id,
+        "consecutive_correct": new_streak,
+        "status": status,
+    }
+    if progress_rows.data:
+        db.table("user_progress").update(
+            {"consecutive_correct": new_streak, "status": status}
+        ).eq("user_id", user.id).eq("knowledge_point_id", kp_id).execute()
+    else:
+        db.table("user_progress").insert(progress).execute()
+
     return {
         "is_correct": is_correct,
         "correct_choice": correct_choice,
+        "consecutive_correct": new_streak,
+        "status": status,
     }
