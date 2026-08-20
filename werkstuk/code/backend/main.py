@@ -80,11 +80,30 @@ def next_problem(topic_id: str, user=Depends(get_current_user)):
         .eq("knowledge_point_id", kp_id)
         .eq("role", "practice")
         .order("sort_order")
-        .limit(1)
         .execute()
     )
     if not problem_rows.data:
         raise HTTPException(status_code=404, detail="No practice problem")
+
+    problem_ids = [row["id"] for row in problem_rows.data]
+    history_rows = (
+        db.table("answer_history")
+        .select("problem_id, created_at")
+        .eq("user_id", user.id)
+        .in_("problem_id", problem_ids)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    answered_ids = {row["problem_id"] for row in history_rows.data}
+
+    for row in problem_rows.data:
+        if row["id"] not in answered_ids:
+            return row
+
+    latest_id = history_rows.data[0]["problem_id"]
+    for row in problem_rows.data:
+        if row["id"] != latest_id:
+            return row
 
     return problem_rows.data[0]
 

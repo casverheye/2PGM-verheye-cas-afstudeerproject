@@ -29,30 +29,40 @@ function LearnContent({ topicId }: { topicId: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState("");
 
-  useEffect(() => {
+  function loadProblem() {
     const apiUrl = import.meta.env.VITE_API_URL as string;
+    setSelected(null);
+    setResult("");
+    setMessage("Loading problem…");
 
-    void supabase.auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token;
-      if (!token) {
-        setMessage("No session token");
-        return;
-      }
-
-      return fetch(`${apiUrl}/topics/${topicId}/next-problem`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(async (response) => {
-        if (!response.ok) {
-          setMessage("Could not load problem");
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        const token = data.session?.access_token;
+        if (!token) {
+          setMessage("No session token");
           return;
         }
-        const body = (await response.json()) as Problem;
-        setProblem(body);
-        setMessage("");
+
+        return fetch(`${apiUrl}/topics/${topicId}/next-problem`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).then(async (response) => {
+          if (!response.ok) {
+            setMessage("Could not load problem");
+            return;
+          }
+          const body = (await response.json()) as Problem;
+          setProblem(body);
+          setMessage("");
+        });
+      })
+      .catch(() => {
+        setMessage("API is down");
       });
-    }).catch(() => {
-      setMessage("API is down");
-    });
+  }
+
+  useEffect(() => {
+    loadProblem();
   }, [topicId]);
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
@@ -187,6 +197,13 @@ function LearnContent({ topicId }: { topicId: string }) {
         </form>
       ) : null}
       {result ? <p>{result}</p> : null}
+      {result ? (
+        <p>
+          <button type="button" className="border p-2" onClick={loadProblem}>
+            Continue
+          </button>
+        </p>
+      ) : null}
     </div>
   );
 }
