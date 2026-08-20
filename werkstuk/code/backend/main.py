@@ -60,6 +60,57 @@ def me(user=Depends(get_current_user)):
     return {"id": user.id, "email": user.email}
 
 
+def review_is_due(next_review_at: str | None) -> bool:
+    if next_review_at is None:
+        return True
+    text = str(next_review_at).replace("Z", "+00:00")
+    due_at = datetime.fromisoformat(text)
+    if due_at.tzinfo is None:
+        due_at = due_at.replace(tzinfo=timezone.utc)
+    return due_at <= datetime.now(timezone.utc)
+
+
+@app.get("/learn-queue")
+def learn_queue(user=Depends(get_current_user)):
+    kp_rows = (
+        db.table("knowledge_points")
+        .select("id, topic_id, title")
+        .eq("topic_id", "addition")
+        .order("sort_order")
+        .limit(1)
+        .execute()
+    )
+    if not kp_rows.data:
+        raise HTTPException(status_code=404, detail="No knowledge point for addition")
+
+    kp = kp_rows.data[0]
+    progress_rows = (
+        db.table("user_progress")
+        .select("status, next_review_at")
+        .eq("user_id", user.id)
+        .eq("knowledge_point_id", kp["id"])
+        .limit(1)
+        .execute()
+    )
+
+    kind = "lesson"
+    can_start = True
+    if progress_rows.data and progress_rows.data[0]["status"] == "completed":
+        kind = "review"
+        can_start = review_is_due(progress_rows.data[0]["next_review_at"])
+
+    return {
+        "items": [
+            {
+                "topic_id": kp["topic_id"],
+                "title": kp["title"],
+                "kind": kind,
+                "can_start": can_start,
+            }
+        ]
+    }
+
+
 @app.get("/topics/{topic_id}/next-problem")
 def next_problem(topic_id: str, user=Depends(get_current_user)):
     kp_rows = (
