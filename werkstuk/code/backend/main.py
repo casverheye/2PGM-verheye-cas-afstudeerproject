@@ -74,41 +74,69 @@ def review_is_due(next_review_at: str | None) -> bool:
 def learn_queue(user=Depends(get_current_user)):
     kp_rows = (
         db.table("knowledge_points")
-        .select("id, topic_id, title")
-        .eq("topic_id", "addition")
+        .select("id, topic_id, title, sort_order")
         .order("sort_order")
-        .limit(1)
         .execute()
     )
     if not kp_rows.data:
-        raise HTTPException(status_code=404, detail="No knowledge point for addition")
+        raise HTTPException(status_code=404, detail="No knowledge points")
 
-    kp = kp_rows.data[0]
+    kp_by_topic = {}
+    for row in kp_rows.data:
+        if row["topic_id"] not in kp_by_topic:
+            kp_by_topic[row["topic_id"]] = row
+
+    kp_ids = [row["id"] for row in kp_by_topic.values()]
     progress_rows = (
         db.table("user_progress")
-        .select("status, next_review_at")
+        .select("knowledge_point_id, status, next_review_at")
         .eq("user_id", user.id)
-        .eq("knowledge_point_id", kp["id"])
-        .limit(1)
+        .in_("knowledge_point_id", kp_ids)
         .execute()
     )
+    progress_by_kp = {row["knowledge_point_id"]: row for row in progress_rows.data}
 
-    kind = "lesson"
-    can_start = True
-    if progress_rows.data and progress_rows.data[0]["status"] == "completed":
-        kind = "review"
-        can_start = review_is_due(progress_rows.data[0]["next_review_at"])
+    edge_rows = (
+        db.table("topic_edges")
+        .select("from_topic_id, to_topic_id, kind")
+        .eq("kind", "prerequisite")
+        .execute()
+    )
+    prereqs_for: dict[str, list[str]] = {}
+    for edge in edge_rows.data:
+        prereqs_for.setdefault(edge["to_topic_id"], []).append(edge["from_topic_id"])
 
-    return {
-        "items": [
+    def topic_is_completed(topic_id: str) -> bool:
+        kp = kp_by_topic.get(topic_id)
+        if kp is None:
+            return False
+        progress = progress_by_kp.get(kp["id"])
+        return bool(progress and progress["status"] == "completed")
+
+    items = []
+    for topic_id, kp in kp_by_topic.items():
+        unlocked = all(
+            topic_is_completed(prereq_id)
+            for prereq_id in prereqs_for.get(topic_id, [])
+        )
+        progress = progress_by_kp.get(kp["id"])
+        completed = bool(progress and progress["status"] == "completed")
+        if completed:
+            kind = "review"
+            can_start = review_is_due(progress["next_review_at"])
+        else:
+            kind = "lesson"
+            can_start = unlocked
+        items.append(
             {
-                "topic_id": kp["topic_id"],
+                "topic_id": topic_id,
                 "title": kp["title"],
                 "kind": kind,
                 "can_start": can_start,
             }
-        ]
-    }
+        )
+
+    return {"items": items}
 
 
 @app.get("/topics/{topic_id}/next-problem")
