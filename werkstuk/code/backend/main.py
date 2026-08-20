@@ -154,6 +154,44 @@ def next_problem(topic_id: str, user=Depends(get_current_user)):
 
     kp_id = kp_rows.data[0]["id"]
 
+    edge_rows = (
+        db.table("topic_edges")
+        .select("from_topic_id")
+        .eq("to_topic_id", topic_id)
+        .eq("kind", "prerequisite")
+        .execute()
+    )
+    for edge in edge_rows.data:
+        prereq_kp_rows = (
+            db.table("knowledge_points")
+            .select("id")
+            .eq("topic_id", edge["from_topic_id"])
+            .order("sort_order")
+            .limit(1)
+            .execute()
+        )
+        if not prereq_kp_rows.data:
+            raise HTTPException(
+                status_code=403,
+                detail="Prerequisites are not met",
+            )
+        prereq_progress = (
+            db.table("user_progress")
+            .select("status")
+            .eq("user_id", user.id)
+            .eq("knowledge_point_id", prereq_kp_rows.data[0]["id"])
+            .limit(1)
+            .execute()
+        )
+        if (
+            not prereq_progress.data
+            or prereq_progress.data[0]["status"] != "completed"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Prerequisites are not met",
+            )
+
     progress_rows = (
         db.table("user_progress")
         .select("status, next_review_at")
