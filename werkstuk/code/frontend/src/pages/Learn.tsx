@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type SubmitEvent } from "react";
 import { useParams } from "@tanstack/react-router";
 import { RequireAuth } from "../lib/RequireAuth";
 import { supabase } from "../lib/supabase";
@@ -26,6 +26,8 @@ export function LearnPage() {
 function LearnContent({ topicId }: { topicId: string }) {
   const [message, setMessage] = useState("Loading problem…");
   const [problem, setProblem] = useState<Problem | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [result, setResult] = useState("");
 
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL as string;
@@ -53,20 +55,131 @@ function LearnContent({ topicId }: { topicId: string }) {
     });
   }, [topicId]);
 
+  function onSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!problem || !selected || result) {
+      return;
+    }
+
+    const apiUrl = import.meta.env.VITE_API_URL as string;
+
+    void supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) {
+        setResult("No session token");
+        return;
+      }
+
+      return fetch(`${apiUrl}/answers`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          problem_id: problem.id,
+          chosen_choice: selected,
+        }),
+      }).then(async (response) => {
+        if (!response.ok) {
+          setResult("Could not grade answer");
+          return;
+        }
+        const body = (await response.json()) as {
+          is_correct: boolean;
+          correct_choice: string;
+        };
+        if (body.is_correct) {
+          setResult("Correct");
+        } else {
+          setResult(`Wrong. The answer is ${body.correct_choice}`);
+        }
+      });
+    });
+  }
+
   return (
     <div className="p-4">
       <h1 className="text-xl">Learn: {topicId}</h1>
       {message ? <p>{message}</p> : null}
       {problem ? (
-        <div>
+        <form onSubmit={onSubmit}>
           <p>{problem.prompt}</p>
-          <p>a) {problem.choice_a}</p>
-          <p>b) {problem.choice_b}</p>
-          <p>c) {problem.choice_c}</p>
-          <p>d) {problem.choice_d}</p>
-          <p>e) {problem.choice_e}</p>
-        </div>
+          <p>
+            <label>
+              <input
+                type="radio"
+                name="choice"
+                value="a"
+                checked={selected === "a"}
+                disabled={Boolean(result)}
+                onChange={() => setSelected("a")}
+              />{" "}
+              a) {problem.choice_a}
+            </label>
+          </p>
+          <p>
+            <label>
+              <input
+                type="radio"
+                name="choice"
+                value="b"
+                checked={selected === "b"}
+                disabled={Boolean(result)}
+                onChange={() => setSelected("b")}
+              />{" "}
+              b) {problem.choice_b}
+            </label>
+          </p>
+          <p>
+            <label>
+              <input
+                type="radio"
+                name="choice"
+                value="c"
+                checked={selected === "c"}
+                disabled={Boolean(result)}
+                onChange={() => setSelected("c")}
+              />{" "}
+              c) {problem.choice_c}
+            </label>
+          </p>
+          <p>
+            <label>
+              <input
+                type="radio"
+                name="choice"
+                value="d"
+                checked={selected === "d"}
+                disabled={Boolean(result)}
+                onChange={() => setSelected("d")}
+              />{" "}
+              d) {problem.choice_d}
+            </label>
+          </p>
+          <p>
+            <label>
+              <input
+                type="radio"
+                name="choice"
+                value="e"
+                checked={selected === "e"}
+                disabled={Boolean(result)}
+                onChange={() => setSelected("e")}
+              />{" "}
+              e) {problem.choice_e}
+            </label>
+          </p>
+          <button
+            type="submit"
+            className="border p-2"
+            disabled={!selected || Boolean(result)}
+          >
+            Submit
+          </button>
+        </form>
       ) : null}
+      {result ? <p>{result}</p> : null}
     </div>
   );
 }

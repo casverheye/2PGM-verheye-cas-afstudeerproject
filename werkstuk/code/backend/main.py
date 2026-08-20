@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
 from supabase import create_client
 
 load_dotenv()
@@ -86,3 +87,41 @@ def next_problem(topic_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="No practice problem")
 
     return problem_rows.data[0]
+
+
+class AnswerIn(BaseModel):
+    problem_id: int
+    chosen_choice: str
+
+
+@app.post("/answers")
+def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
+    if body.chosen_choice not in ("a", "b", "c", "d", "e"):
+        raise HTTPException(status_code=400, detail="chosen_choice must be a, b, c, d, or e")
+
+    problem_rows = (
+        db.table("problems")
+        .select("id, correct_choice")
+        .eq("id", body.problem_id)
+        .limit(1)
+        .execute()
+    )
+    if not problem_rows.data:
+        raise HTTPException(status_code=404, detail="Problem not found")
+
+    correct_choice = problem_rows.data[0]["correct_choice"]
+    is_correct = body.chosen_choice == correct_choice
+
+    db.table("answer_history").insert(
+        {
+            "user_id": user.id,
+            "problem_id": body.problem_id,
+            "chosen_choice": body.chosen_choice,
+            "is_correct": is_correct,
+        }
+    ).execute()
+
+    return {
+        "is_correct": is_correct,
+        "correct_choice": correct_choice,
+    }
