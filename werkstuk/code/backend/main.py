@@ -33,6 +33,19 @@ app.add_middleware(
 
 bearer = HTTPBearer()
 
+SRS_INTERVAL_DAYS = [1, 3, 7, 16, 35]
+
+
+def next_srs_interval_days(previous_days: int | None) -> int:
+    if previous_days is None:
+        return SRS_INTERVAL_DAYS[0]
+    for index, days in enumerate(SRS_INTERVAL_DAYS):
+        if previous_days <= days:
+            if index + 1 < len(SRS_INTERVAL_DAYS):
+                return SRS_INTERVAL_DAYS[index + 1]
+            return SRS_INTERVAL_DAYS[-1]
+    return SRS_INTERVAL_DAYS[-1]
+
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer),
@@ -277,7 +290,7 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
 
     progress_rows = (
         db.table("user_progress")
-        .select("consecutive_correct, status, next_review_at")
+        .select("consecutive_correct, status, next_review_at, srs_interval_days")
         .eq("user_id", user.id)
         .eq("knowledge_point_id", kp_id)
         .limit(1)
@@ -286,10 +299,12 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
     old_streak = 0
     old_status = None
     old_next_review_at = None
+    old_interval_days = None
     if progress_rows.data:
         old_streak = progress_rows.data[0]["consecutive_correct"]
         old_status = progress_rows.data[0]["status"]
         old_next_review_at = progress_rows.data[0]["next_review_at"]
+        old_interval_days = progress_rows.data[0]["srs_interval_days"]
 
     if is_correct:
         new_streak = old_streak + 1
@@ -297,12 +312,20 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
         new_streak = 0
 
     next_review_at = old_next_review_at
+    interval_days = old_interval_days
     if new_streak >= 2:
         status = "completed"
         first_pass = old_status != "completed" or old_next_review_at is None
         if first_pass:
+            interval_days = SRS_INTERVAL_DAYS[0]
             next_review_at = (
-                datetime.now(timezone.utc) + timedelta(days=1)
+                datetime.now(timezone.utc) + timedelta(days=interval_days)
+            ).isoformat()
+        elif review_is_due(old_next_review_at):
+            base_days = old_interval_days if old_interval_days is not None else 1
+            interval_days = next_srs_interval_days(base_days)
+            next_review_at = (
+                datetime.now(timezone.utc) + timedelta(days=interval_days)
             ).isoformat()
     else:
         status = "in_progress"
@@ -313,6 +336,7 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
         "consecutive_correct": new_streak,
         "status": status,
         "next_review_at": next_review_at,
+        "srs_interval_days": interval_days,
     }
     if progress_rows.data:
         db.table("user_progress").update(
@@ -320,6 +344,7 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
                 "consecutive_correct": new_streak,
                 "status": status,
                 "next_review_at": next_review_at,
+                "srs_interval_days": interval_days,
             }
         ).eq("user_id", user.id).eq("knowledge_point_id", kp_id).execute()
     else:
@@ -331,4 +356,5 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
         "consecutive_correct": new_streak,
         "status": status,
         "next_review_at": next_review_at,
+        "srs_interval_days": interval_days,
     }
