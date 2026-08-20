@@ -100,11 +100,13 @@ function LearnContent({ topicId }: { topicId: string }) {
           correct_choice: string;
           consecutive_correct: number;
           status: string;
+          next_review_at: string | null;
         };
         const streak = `${body.consecutive_correct}/2 in a row`;
         if (body.is_correct) {
           if (body.status === "completed") {
-            setResult(`Correct. Skill completed (${streak})`);
+            const when = body.next_review_at ?? "later";
+            setResult(`Correct. Skill completed. Review at ${when}`);
           } else {
             setResult(`Correct. ${streak}`);
           }

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
@@ -144,23 +145,33 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
 
     progress_rows = (
         db.table("user_progress")
-        .select("consecutive_correct")
+        .select("consecutive_correct, status, next_review_at")
         .eq("user_id", user.id)
         .eq("knowledge_point_id", kp_id)
         .limit(1)
         .execute()
     )
     old_streak = 0
+    old_status = None
+    old_next_review_at = None
     if progress_rows.data:
         old_streak = progress_rows.data[0]["consecutive_correct"]
+        old_status = progress_rows.data[0]["status"]
+        old_next_review_at = progress_rows.data[0]["next_review_at"]
 
     if is_correct:
         new_streak = old_streak + 1
     else:
         new_streak = 0
 
+    next_review_at = old_next_review_at
     if new_streak >= 2:
         status = "completed"
+        first_pass = old_status != "completed" or old_next_review_at is None
+        if first_pass:
+            next_review_at = (
+                datetime.now(timezone.utc) + timedelta(days=1)
+            ).isoformat()
     else:
         status = "in_progress"
 
@@ -169,10 +180,15 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
         "knowledge_point_id": kp_id,
         "consecutive_correct": new_streak,
         "status": status,
+        "next_review_at": next_review_at,
     }
     if progress_rows.data:
         db.table("user_progress").update(
-            {"consecutive_correct": new_streak, "status": status}
+            {
+                "consecutive_correct": new_streak,
+                "status": status,
+                "next_review_at": next_review_at,
+            }
         ).eq("user_id", user.id).eq("knowledge_point_id", kp_id).execute()
     else:
         db.table("user_progress").insert(progress).execute()
@@ -182,4 +198,5 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
         "correct_choice": correct_choice,
         "consecutive_correct": new_streak,
         "status": status,
+        "next_review_at": next_review_at,
     }
