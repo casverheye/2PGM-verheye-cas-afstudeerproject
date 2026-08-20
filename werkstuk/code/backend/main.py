@@ -126,6 +126,21 @@ def next_problem(topic_id: str, user=Depends(get_current_user)):
 
     kp_id = kp_rows.data[0]["id"]
 
+    progress_rows = (
+        db.table("user_progress")
+        .select("status, next_review_at")
+        .eq("user_id", user.id)
+        .eq("knowledge_point_id", kp_id)
+        .limit(1)
+        .execute()
+    )
+    if progress_rows.data and progress_rows.data[0]["status"] == "completed":
+        if not review_is_due(progress_rows.data[0]["next_review_at"]):
+            raise HTTPException(
+                status_code=403,
+                detail="Review is not due yet",
+            )
+
     problem_rows = (
         db.table("problems")
         .select("id, prompt, choice_a, choice_b, choice_c, choice_d, choice_e")
