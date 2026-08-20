@@ -50,6 +50,12 @@ function LearnContent({ topicId }: { topicId: string }) {
         return fetch(`${apiUrl}/topics/${topicId}/next-problem`, {
           headers: { Authorization: `Bearer ${token}` },
         }).then(async (response) => {
+          if (response.status === 403) {
+            const errorBody = (await response.json()) as { detail: string };
+            setProblem(null);
+            setMessage(errorBody.detail);
+            return;
+          }
           if (!response.ok) {
             setMessage("Could not load problem");
             return;
