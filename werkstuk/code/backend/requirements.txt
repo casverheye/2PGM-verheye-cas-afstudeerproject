@@ -1,4 +1,5 @@
-fastapi
-uvicorn
-python-dotenv
-supabase
+fastapi==0.141.1
+uvicorn==0.52.4
+supabase==2.31.0
+python-dotenv==1.2.3
+httpx==0.28.1
