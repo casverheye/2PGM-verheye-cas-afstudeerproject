@@ -19,9 +19,15 @@ from routers import admin, answers, courses, diagnostics, lessons, quizzes, task
 
 app = FastAPI(title="Mathlete API")
 
+
+def frontend_origins() -> list[str]:
+    raw = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")],
+    allow_origins=frontend_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
