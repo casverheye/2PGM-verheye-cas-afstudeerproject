@@ -472,7 +472,7 @@ function AnswerFooter({
       ) : null}
       {answer.topic_completed ? (
         <p className="mt-3">
-          Topic complete.{" "}
+          {answer.context === "review" ? "Review complete. " : "Topic complete. "}
           {answer.next_review_at
             ? `Next review scheduled: ${new Date(answer.next_review_at).toLocaleDateString()}`
             : null}

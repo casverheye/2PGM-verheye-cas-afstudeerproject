@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import type { User } from "@supabase/supabase-js";
 import { useAuth } from "../lib/authContext";
-import { apiGet } from "../lib/api";
 import { useApiGet } from "../lib/useApiGet";
 import { CoursesMegaPanel, CoursesNav } from "./CoursesNav";
 import { navLinkClass } from "../lib/styles";
@@ -37,7 +36,6 @@ function userFullName(user: User) {
 
 export function RootLayout() {
   const { user, loading, signOut } = useAuth();
-  const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const hideNav =
     pathname === "/diagnostic" ||
@@ -55,33 +53,6 @@ export function RootLayout() {
   // Only fetch /me while logged in; the flag only shows the Admin nav link.
   const { data: me } = useApiGet<{ admin: boolean }>(user ? "/me" : null);
   const isAdmin = user != null && me?.admin === true;
-
-  useEffect(() => {
-    if (!user || pathname.startsWith("/quiz/")) {
-      return;
-    }
-    if (pathname === "/login" || pathname === "/register") {
-      return;
-    }
-    let ignore = false;
-    apiGet<{ active: boolean; quiz_id: number | null }>("/quizzes/active")
-      .then((body) => {
-        if (ignore || !body.active || body.quiz_id == null) {
-          return;
-        }
-        void navigate({
-          to: "/quiz/$quizId",
-          params: { quizId: String(body.quiz_id) },
-          replace: true,
-        });
-      })
-      .catch(() => {
-        // stay on the current page if the check fails
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [user, pathname, navigate]);
 
   function dismissMenu() {
     ignoreHover.current = true;

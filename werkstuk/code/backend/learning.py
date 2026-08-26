@@ -26,6 +26,7 @@ MIN_STABILITY = 0.5
 MAX_STABILITY = 365.0
 HALF_LIFE_FACTOR = 2.0  # half-life = HALF_LIFE_FACTOR * stability
 HALT_FAIL_STREAK = 3  # consecutive wrong answers in a lesson => halt
+REVIEW_PASS_STREAK = 2  # a review sitting ends after two correct in a row
 LESSON_SITTING_CAP = 8  # mixed lesson answers on one KP before we pause
 LESSON_SITTING_GAP_MINUTES = 10
 LESSON_SITTING_DETAIL = (
@@ -193,6 +194,47 @@ def lesson_burst_count(user_id: str, kp_id: int) -> int:
         count += 1
         cursor = stamp
     return count
+
+
+def trailing_correct_streak(
+    user_id: str, problem_ids: list[int], context: str
+) -> int:
+    """Newest→oldest correct answers in the current sitting for this context.
+
+    Stops at a wrong answer or a gap longer than LESSON_SITTING_GAP_MINUTES.
+    Reviews use this so one lucky hit cannot close the sitting: the topic is
+    already `completed`, so `topic_completed()` would otherwise be true after
+    the first correct review answer.
+    """
+    if not problem_ids:
+        return 0
+    rows = (
+        db.table("answer_history")
+        .select("created_at, is_correct")
+        .eq("user_id", user_id)
+        .eq("context", context)
+        .in_("problem_id", problem_ids)
+        .order("created_at", desc=True)
+        .limit(40)
+        .execute()
+        .data
+    )
+    if not rows:
+        return 0
+    gap = timedelta(minutes=LESSON_SITTING_GAP_MINUTES)
+    cursor = now_utc()
+    streak = 0
+    for row in rows:
+        stamp = parse_ts(row["created_at"])
+        if stamp is None:
+            break
+        if cursor - stamp > gap:
+            break
+        if not row["is_correct"]:
+            break
+        streak += 1
+        cursor = stamp
+    return streak
 
 
 def lesson_sitting_exhausted(user_id: str, kp_id: int, row: dict | None) -> bool:

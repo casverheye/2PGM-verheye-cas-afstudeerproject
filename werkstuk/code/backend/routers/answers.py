@@ -15,12 +15,14 @@ from learning import (
     HALT_FAIL_STREAK,
     LESSON_SITTING_DETAIL,
     MASTERY_THRESHOLD,
+    REVIEW_PASS_STREAK,
     apply_evidence,
     get_progress_map,
     lesson_sitting_exhausted,
     new_progress_row,
     now_utc,
     save_progress,
+    trailing_correct_streak,
 )
 from gates import QUIZ_IN_PROGRESS_DETAIL, active_quiz_id
 from problems import CHOICE_LETTERS
@@ -189,6 +191,7 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
     progress = get_progress_map(user.id)
     row = progress.get(kp_id) or new_progress_row(user.id, kp_id)
     was_completed = row.get("status") == "completed"
+    previous_review_at = row.get("next_review_at")
 
     # validate quiz linkage before writing anything
     quiz_question = None
@@ -220,6 +223,29 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
 
     # explicit evidence on this knowledge point
     apply_evidence(row, is_correct, 1.0, now, explicit=True)
+
+    review_streak = 0
+    if context == "review":
+        kp_ids = [item.id for item in graph.kps_by_topic.get(topic_id, [])]
+        review_problems = (
+            db.table("problems")
+            .select("id")
+            .in_("knowledge_point_id", kp_ids)
+            .execute()
+            .data
+            if kp_ids
+            else []
+        )
+        review_streak = trailing_correct_streak(
+            user.id,
+            [item["id"] for item in review_problems],
+            "review",
+        )
+        # Keep the review due until two correct in a row this sitting.
+        if is_correct and review_streak < REVIEW_PASS_STREAK:
+            row["next_review_at"] = previous_review_at
+            if was_completed and (row.get("mastery") or 0) >= MASTERY_THRESHOLD:
+                row["status"] = "completed"
 
     # lesson halting: repeated failure stops the lesson and triggers remediation
     halted = False
@@ -268,6 +294,10 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
         }
 
     fresh_states = kp_states(topic_id, graph, get_progress_map(user.id), now)
+    if context == "review":
+        sitting_done = review_streak >= REVIEW_PASS_STREAK
+    else:
+        sitting_done = topic_completed(fresh_states)
 
     return {
         "is_correct": is_correct,
@@ -282,7 +312,7 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
             "mastered": row["status"] == "completed",
             "status": row["status"],
         },
-        "topic_completed": topic_completed(fresh_states),
+        "topic_completed": sitting_done,
         "halted": halted,
         "halt_reason": halt_reason,
         "sitting_capped": sitting_capped,

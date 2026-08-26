@@ -1,7 +1,6 @@
 import { useState, type SubmitEvent } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { RequireAuth } from "../lib/RequireAuth";
-import { useAuth } from "../lib/authContext";
 import { apiPost } from "../lib/api";
 import { useApiGet } from "../lib/useApiGet";
 import { ProblemChoices } from "../components/ProblemChoices";
@@ -30,7 +29,6 @@ export function QuizPage() {
 }
 
 function QuizContent({ quizId }: { quizId: string }) {
-  const { signOut } = useAuth();
   const { data: quiz, error: loadError, reload } = useApiGet<QuizDetail>(
     `/quizzes/${quizId}`,
   );
@@ -102,17 +100,13 @@ function QuizContent({ quizId }: { quizId: string }) {
 
   if (!quiz) {
     return (
-      <QuestionShell showClose={false}>
+      <QuestionShell>
         <p className={`mb-4 ${loadError ? errorClass : mutedClass}`}>
           {loadError ?? "Loading quiz…"}
         </p>
-        <button
-          type="button"
-          className={linkClass}
-          onClick={() => void signOut()}
-        >
-          Log out
-        </button>
+        <Link to="/learn" className={linkClass}>
+          Back to learn
+        </Link>
       </QuestionShell>
     );
   }
@@ -122,7 +116,6 @@ function QuizContent({ quizId }: { quizId: string }) {
       questionNumber={quiz.answered + 1}
       total={quiz.total}
       currentIndex={quiz.answered + 1}
-      showClose={false}
     >
       {message ? <p className={`mb-4 ${errorClass}`}>{message}</p> : null}
       <p className={`mb-4 ${mutedClass}`}>
@@ -146,15 +139,6 @@ function QuizContent({ quizId }: { quizId: string }) {
           </button>
         </form>
       ) : null}
-      <p className="mt-8">
-        <button
-          type="button"
-          className={linkClass}
-          onClick={() => void signOut()}
-        >
-          Log out
-        </button>
-      </p>
     </QuestionShell>
   );
 }

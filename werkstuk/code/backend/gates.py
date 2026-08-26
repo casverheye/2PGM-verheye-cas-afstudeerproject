@@ -1,8 +1,9 @@
 """Gates that routes check before letting a student act.
 
 Two rules the whole app enforces:
-- An unfinished quiz locks Learn, lessons, and the graph until it is done,
-  so quiz answers are always given without lesson notes.
+- An unfinished quiz is the only Learn task, and lessons, topic pages, and
+  the graph stay locked so quiz answers are given without lesson notes.
+  The student can leave the quiz page and resume later from Learn.
 - Lessons, reviews, and quizzes in a course stay locked until that course's
   placement diagnostic is finished.
 """

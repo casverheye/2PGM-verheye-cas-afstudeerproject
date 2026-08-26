@@ -77,7 +77,13 @@ def _open_topic(topic_id: str, user) -> TopicSession:
         raise HTTPException(status_code=403, detail=detail)
 
     completed = topic_completed(states)
-    if not completed and not prereqs_met(topic_id, graph, progress, now):
+    started = any(state.started for state in states)
+    # New lessons stay locked behind prerequisites. A review, a continued
+    # lesson, or a skill that dropped out of mastery already has a row, so
+    # the student must be able to open it even if a prerequisite got weak.
+    if not completed and not started and not prereqs_met(
+        topic_id, graph, progress, now
+    ):
         raise HTTPException(status_code=403, detail="Prerequisites are not met")
 
     if completed:
