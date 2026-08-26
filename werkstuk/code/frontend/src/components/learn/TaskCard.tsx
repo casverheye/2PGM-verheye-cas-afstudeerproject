@@ -40,6 +40,9 @@ function ProgressBar({ percent }: { percent: number }) {
 }
 
 function taskActionLabel(task: Task) {
+  if (task.title.startsWith("Resume")) {
+    return "Resume";
+  }
   if (task.type === "PRACTICE") {
     return "Continue";
   }
@@ -73,6 +76,9 @@ export function TaskCard({ task, onQuiz }: { task: Task; onQuiz: () => void }) {
         </span>
       </div>
       <p className="mt-1 text-lg font-semibold text-navy">{task.title}</p>
+      {task.reasons[0] ? (
+        <p className={`mt-2 ${mutedClass}`}>{task.reasons[0]}</p>
+      ) : null}
       {prereqs.length > 0 ? (
         <p className={`mt-2 ${mutedClass}`}>
           Prerequisites:{" "}

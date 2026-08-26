@@ -30,7 +30,6 @@ from learning import (
     PREREQ_OK_THRESHOLD,
     get_progress_map,
     now_utc,
-    save_progress,
 )
 from placement import session_progress_pct
 
@@ -290,6 +289,8 @@ def _quiz_task(user_id: str, course_id: str, graph: Graph, progress: dict, now) 
         return None
 
     learned = eligible_quiz_topics(course_id, graph, progress, now)
+    if len(learned) < 2:
+        return None
     minutes = max(6, len(learned) * QUIZ_QUESTIONS_PER_TOPIC)
     if kind == "final":
         title = "Course quiz"
@@ -402,8 +403,8 @@ def build_tasks(user_id: str, course_id: str, graph: Graph | None = None) -> lis
                 graph.course_for_topic.get(blocker_id, ""), None
             )
             reasons = [
-                f"Needed before '{graph.topics[topic_id]}' in this course",
-                "Mastering it unlocks new material here",
+                f"First startable step toward '{graph.topics[topic_id]}'",
+                "Mastering it unlocks the next skills on that path",
             ]
             if blocker_course is not None:
                 reasons.insert(
@@ -452,10 +453,8 @@ def build_tasks(user_id: str, course_id: str, graph: Graph | None = None) -> lis
                 )
             )
         else:
-            # Prerequisites recovered: lift the halt and resume the lesson.
-            for state in halted_states:
-                state.row["status"] = "in_progress"
-                save_progress(state.row)
+            # Rows stay halted until the student opens the lesson. GET /next-tasks
+            # only offers the resume card — it must not rewrite progress.
             tasks.append(
                 _task(
                     "PRACTICE",
@@ -469,11 +468,14 @@ def build_tasks(user_id: str, course_id: str, graph: Graph | None = None) -> lis
                     progress_pct=_topic_progress_pct(states),
                 )
             )
-            learnable[topic_id] = "continue"
 
     # --- Due reviews -------------------------------------------------------
     for topic_id in course_topic_ids:
         states = states_by_topic[topic_id]
+        # A half-finished topic is a lesson, not a review. Mixing both cards
+        # for the same topic (one KP still in progress, another due) is wrong.
+        if not topic_completed(states):
+            continue
         due_states = [state for state in states if state.due]
         if not due_states:
             continue
@@ -509,6 +511,8 @@ def build_tasks(user_id: str, course_id: str, graph: Graph | None = None) -> lis
         if covered_by:
             covering_title = graph.topics[covered_by[0]]
             value -= 20
+            # Keep due reviews above brand-new lessons (value 50).
+            value = max(value, 52)
             reasons.append(
                 f"Can be refreshed implicitly by working on '{covering_title}'"
             )

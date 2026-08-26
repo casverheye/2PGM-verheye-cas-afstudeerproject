@@ -15,6 +15,7 @@ from learning import (
     HALT_FAIL_STREAK,
     LESSON_SITTING_DETAIL,
     MASTERY_THRESHOLD,
+    REVIEW_FAIL_STREAK,
     REVIEW_PASS_STREAK,
     apply_evidence,
     get_progress_map,
@@ -23,6 +24,7 @@ from learning import (
     now_utc,
     save_progress,
     trailing_correct_streak,
+    trailing_fail_streak,
 )
 from gates import QUIZ_IN_PROGRESS_DETAIL, active_quiz_id
 from problems import CHOICE_LETTERS
@@ -209,6 +211,9 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
     else:
         context = "lesson"
 
+    if context == "lesson" and lesson_sitting_exhausted(user.id, kp_id, row):
+        raise HTTPException(status_code=403, detail=LESSON_SITTING_DETAIL)
+
     db.table("answer_history").insert(
         {
             "user_id": user.id,
@@ -223,6 +228,25 @@ def submit_answer(body: AnswerIn, user=Depends(get_current_user)):
 
     # explicit evidence on this knowledge point
     apply_evidence(row, is_correct, 1.0, now, explicit=True)
+
+    if (
+        not is_correct
+        and was_completed
+        and context in ("review", "quiz")
+    ):
+        kp_problem_ids = [
+            item["id"]
+            for item in db.table("problems")
+            .select("id")
+            .eq("knowledge_point_id", kp_id)
+            .execute()
+            .data
+        ]
+        fail_sitting = trailing_fail_streak(user.id, kp_problem_ids, context)
+        if fail_sitting < REVIEW_FAIL_STREAK:
+            # Memory drops, but one miss does not reopen the skill as a lesson.
+            row["status"] = "completed"
+            row["next_review_at"] = previous_review_at or now.isoformat()
 
     review_streak = 0
     if context == "review":

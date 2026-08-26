@@ -78,7 +78,7 @@ export function QuestionShell({
         {showClose ? (
           <Link
             to="/learn"
-            aria-label="Back to learn. Your progress is saved."
+            aria-label="Close lesson. Your progress is saved."
             className="relative z-10 ml-auto text-navy/70 transition-colors hover:text-navy"
           >
             <X className="h-4 w-4" aria-hidden="true" />
@@ -98,7 +98,7 @@ export function QuestionShell({
                 onClick={() =>
                   setOpenHelpFor(helpOpen ? null : (questionNumber ?? null))
                 }
-                aria-label={helpOpen ? "Back to question" : "How this topic works"}
+                aria-label="How this topic works"
                 aria-expanded={helpOpen}
                 className="cursor-pointer text-navy/70 transition-colors hover:text-navy"
               >

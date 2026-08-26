@@ -6,6 +6,7 @@ from auth import get_current_user
 from db import db
 from graph import (
     course_completed,
+    find_weak_prerequisites,
     kp_states,
     load_graph,
     prereqs_met,
@@ -69,6 +70,9 @@ def learn_queue(user=Depends(get_current_user)):
         mastered = sum(1 for state in states if state.mastered)
         completed = topic_completed(states)
         halted = any(state.halted for state in states)
+        weak_halt = halted and bool(
+            find_weak_prerequisites(topic_id, graph, progress, now)
+        )
         started = any(state.started for state in states)
         unlocked = prereqs_met(topic_id, graph, progress, now)
         due = any(state.due for state in states)
@@ -99,6 +103,7 @@ def learn_queue(user=Depends(get_current_user)):
                 and not quiz_lock
                 and (
                     (completed and due)
+                    or (halted and not weak_halt)
                     or (not completed and not halted and unlocked)
                 ),
                 "due_review": due,

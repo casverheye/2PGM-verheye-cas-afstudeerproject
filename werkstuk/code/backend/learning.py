@@ -27,11 +27,13 @@ MAX_STABILITY = 365.0
 HALF_LIFE_FACTOR = 2.0  # half-life = HALF_LIFE_FACTOR * stability
 HALT_FAIL_STREAK = 3  # consecutive wrong answers in a lesson => halt
 REVIEW_PASS_STREAK = 2  # a review sitting ends after two correct in a row
+REVIEW_FAIL_STREAK = 2  # two misses in a row reopen a mastered skill
 LESSON_SITTING_CAP = 8  # mixed lesson answers on one KP before we pause
 LESSON_SITTING_GAP_MINUTES = 10
 LESSON_SITTING_DETAIL = (
     "That's enough practice on this skill for now. "
-    "Your progress is saved. Continue later from Learn."
+    "Your progress is saved. Come back to this lesson in about 10 minutes, "
+    "or pick a different task on Learn."
 )
 
 
@@ -231,6 +233,44 @@ def trailing_correct_streak(
         if cursor - stamp > gap:
             break
         if not row["is_correct"]:
+            break
+        streak += 1
+        cursor = stamp
+    return streak
+
+
+def trailing_fail_streak(
+    user_id: str, problem_ids: list[int], context: str
+) -> int:
+    """Newest→oldest wrong answers in the current sitting for this context.
+
+    Used so one review or quiz miss does not reopen a mastered skill.
+    """
+    if not problem_ids:
+        return 0
+    rows = (
+        db.table("answer_history")
+        .select("created_at, is_correct")
+        .eq("user_id", user_id)
+        .eq("context", context)
+        .in_("problem_id", problem_ids)
+        .order("created_at", desc=True)
+        .limit(40)
+        .execute()
+        .data
+    )
+    if not rows:
+        return 0
+    gap = timedelta(minutes=LESSON_SITTING_GAP_MINUTES)
+    cursor = now_utc()
+    streak = 0
+    for row in rows:
+        stamp = parse_ts(row["created_at"])
+        if stamp is None:
+            break
+        if cursor - stamp > gap:
+            break
+        if row["is_correct"]:
             break
         streak += 1
         cursor = stamp

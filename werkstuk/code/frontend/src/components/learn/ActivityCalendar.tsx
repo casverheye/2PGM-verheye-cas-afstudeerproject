@@ -32,7 +32,7 @@ export function ActivityCalendar({ data }: { data: LearningCalendar }) {
     ...Array.from({ length: firstWeekday }, () => null),
     ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
   ];
-  const monthLabel = new Date(year, month, 1).toLocaleString(undefined, {
+  const monthLabel = new Date(year, month, 1).toLocaleString("en", {
     month: "long",
     year: "numeric",
   });

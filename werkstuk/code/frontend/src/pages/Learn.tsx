@@ -52,6 +52,18 @@ function dropCappedScreens(screens: Screen[]): Screen[] {
   );
 }
 
+function restoreLessonScreens(
+  screens: Screen[],
+  mapItem: (item: Screen) => Screen,
+) {
+  const mapped = screens.map(mapItem);
+  const restored = dropCappedScreens(mapped);
+  return {
+    restored,
+    sittingWasCapped: restored.length !== mapped.length,
+  };
+}
+
 function lastAnsweredNeedsNext(screens: Screen[]): boolean {
   const last = screens[screens.length - 1];
   return (
@@ -59,7 +71,8 @@ function lastAnsweredNeedsNext(screens: Screen[]): boolean {
     last.kind === "practice" &&
     last.answer != null &&
     !last.answer.topic_completed &&
-    !last.answer.halted
+    !last.answer.halted &&
+    !last.answer.sitting_capped
   );
 }
 
@@ -134,8 +147,9 @@ function LearnContent({ topicId }: { topicId: string }) {
             ? readSavedSession(sessionKey(userId, topicId), isScreen)
             : null;
           if (saved) {
-            const restored = dropCappedScreens(
-              saved.screens.map((item) => {
+            const { restored, sittingWasCapped } = restoreLessonScreens(
+              saved.screens,
+              (item) => {
                 if (item.kind === "practice" && item.answer?.halted) {
                   return {
                     ...item,
@@ -143,7 +157,7 @@ function LearnContent({ topicId }: { topicId: string }) {
                   };
                 }
                 return item;
-              }),
+              },
             );
             if (restored.length > 0) {
               const nextIndex = Math.min(Math.max(saved.index, 0), restored.length - 1);
@@ -155,7 +169,7 @@ function LearnContent({ topicId }: { topicId: string }) {
               }
               setError("");
               setReady(true);
-              if (lastAnsweredNeedsNext(restored)) {
+              if (lastAnsweredNeedsNext(restored) && !sittingWasCapped) {
                 loadPractice(
                   topicId,
                   () => ignore,
@@ -177,8 +191,9 @@ function LearnContent({ topicId }: { topicId: string }) {
           ? readSavedSession(sessionKey(userId, topicId), isScreen)
           : null;
         if (saved) {
-          const restored = dropCappedScreens(
-            saved.screens.map((item) => {
+          const { restored, sittingWasCapped } = restoreLessonScreens(
+            saved.screens,
+            (item) => {
               if (item.kind === "intro") {
                 return { ...item, intro: body };
               }
@@ -192,7 +207,7 @@ function LearnContent({ topicId }: { topicId: string }) {
                 };
               }
               return item;
-            }),
+            },
           );
           if (restored.length > 0) {
             const nextIndex = Math.min(Math.max(saved.index, 0), restored.length - 1);
@@ -204,7 +219,7 @@ function LearnContent({ topicId }: { topicId: string }) {
             }
             setError("");
             setReady(true);
-            if (lastAnsweredNeedsNext(restored)) {
+            if (lastAnsweredNeedsNext(restored) && !sittingWasCapped) {
               loadPractice(
                 topicId,
                 () => ignore,

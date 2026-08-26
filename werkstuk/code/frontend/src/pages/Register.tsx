@@ -27,13 +27,20 @@ function RegisterContent() {
     setError("");
     setCreated(false);
 
-    const { error: signUpError } = await supabase.auth.signUp({
+    const first = firstName.trim();
+    const last = lastName.trim();
+    if (!first || !last) {
+      setError("First and last name cannot be empty.");
+      return;
+    }
+
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
+          first_name: first,
+          last_name: last,
         },
       },
     });
@@ -43,6 +50,13 @@ function RegisterContent() {
       return;
     }
 
+    if (data.session) {
+      try {
+        sessionStorage.setItem("mathlete-just-registered", "1");
+      } catch {
+        // ignore
+      }
+    }
     setCreated(true);
   }
 
@@ -59,6 +73,7 @@ function RegisterContent() {
             onChange={(event) => setFirstName(event.target.value)}
             required
             autoComplete="given-name"
+            maxLength={80}
             className={inputClass}
           />
         </Field>
@@ -70,6 +85,7 @@ function RegisterContent() {
             onChange={(event) => setLastName(event.target.value)}
             required
             autoComplete="family-name"
+            maxLength={80}
             className={inputClass}
           />
         </Field>

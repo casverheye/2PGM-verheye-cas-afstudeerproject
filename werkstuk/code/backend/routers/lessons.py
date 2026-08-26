@@ -21,8 +21,10 @@ from graph import (
     topic_is_listed,
 )
 from learning import (
+    LESSON_SITTING_DETAIL,
     MASTERY_THRESHOLD,
     get_progress_map,
+    lesson_sitting_exhausted,
     new_progress_row,
     now_utc,
     save_progress,
@@ -47,7 +49,11 @@ class TopicSession:
 
 
 def _open_topic(topic_id: str, user) -> TopicSession:
-    """Same gates as a lesson: known topic, not halted, prereqs or review."""
+    """Same gates as a lesson: known topic, prereqs or review.
+
+    Halted lessons with a weak prerequisite stay locked. Halted lessons
+    whose prerequisites look fine are opened here: that write lifts halt.
+    """
     now = now_utc()
     graph = load_graph()
     if topic_id not in graph.topics or not topic_is_listed(graph, topic_id):
@@ -68,13 +74,20 @@ def _open_topic(topic_id: str, user) -> TopicSession:
     if any(state.halted for state in states):
         weak = find_weak_prerequisites(topic_id, graph, progress, now)
         if weak:
-            detail = (
-                "This lesson is halted. Strengthen the prerequisite "
-                f"'{weak[0].title}' first (see Learn)."
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "This lesson is halted. Strengthen the prerequisite "
+                    f"'{weak[0].title}' first (see Learn)."
+                ),
             )
-        else:
-            detail = "This lesson is halted. Check Learn for the next step."
-        raise HTTPException(status_code=403, detail=detail)
+        # Resume from Learn: opening the lesson is the write that lifts halt.
+        for state in states:
+            if state.halted and state.row is not None:
+                state.row["status"] = "in_progress"
+                save_progress(state.row)
+        progress = get_progress_map(user.id)
+        states = kp_states(topic_id, graph, progress, now)
 
     completed = topic_completed(states)
     started = any(state.started for state in states)
@@ -153,6 +166,12 @@ def next_problem(topic_id: str, user=Depends(get_current_user)):
     kp = session.current.kp
     if session.current.row is None:
         save_progress(new_progress_row(user.id, kp.id))
+        session.current.row = get_progress_map(user.id).get(kp.id)
+
+    if session.mode == "lesson" and lesson_sitting_exhausted(
+        user.id, kp.id, session.current.row
+    ):
+        raise HTTPException(status_code=403, detail=LESSON_SITTING_DETAIL)
 
     problem = pick_practice_problem(user.id, kp.id)
     return {

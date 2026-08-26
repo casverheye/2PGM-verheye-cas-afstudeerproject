@@ -495,6 +495,17 @@ def main():
         None,
     )
     check(resumed is not None, "fractions lesson un-halted after remediation", tasks)
+    check(
+        sum(
+            1
+            for t in tasks
+            if t["type"] == "PRACTICE" and t.get("topic_id") == "fractions"
+        )
+        == 1,
+        "halt resume is a single Practice card, not Resume plus Continue",
+        tasks,
+    )
+    api(token, "GET", "/topics/fractions/intro")
 
     print("== 8. switching back: course A is exactly as the student left it ==")
     api(token, "POST", "/courses/arithmetic/activate")

@@ -6,7 +6,7 @@ import { Bone } from "../components/Bone";
 import { ActivityCalendar } from "../components/learn/ActivityCalendar";
 import { ProgressRing } from "../components/learn/ProgressRing";
 import { TaskCard } from "../components/learn/TaskCard";
-import { cardClass, errorClass, mutedClass, taskClass } from "../lib/styles";
+import { cardClass, errorClass, mutedClass, successClass, taskClass } from "../lib/styles";
 import type {
   ActiveCourse,
   Course,
@@ -36,6 +36,7 @@ function LearnHomeContent() {
   const [nextReviewAt, setNextReviewAt] = useState<string | null>(null);
   const [nextCourse, setNextCourse] = useState<ActiveCourse | null>(null);
   const [calendar, setCalendar] = useState<LearningCalendar | null>(null);
+  const [welcome, setWelcome] = useState("");
   const calendarRequest = useRef(0);
 
   function applyPlan(plan: LearnPlan, library: { items: QueueItem[] }) {
@@ -59,6 +60,14 @@ function LearnHomeContent() {
   }
 
   useEffect(() => {
+    try {
+      if (sessionStorage.getItem("mathlete-just-registered")) {
+        sessionStorage.removeItem("mathlete-just-registered");
+        setWelcome("Account created. You're signed in.");
+      }
+    } catch {
+      // ignore
+    }
     let ignore = false;
     apiGet<{ courses: Course[] }>("/courses")
       .then((catalog) => {
@@ -186,6 +195,9 @@ function LearnHomeContent() {
       </aside>
 
       <section className="min-w-0 flex-1">
+        {welcome ? (
+          <p className={`mb-4 ${successClass}`}>{welcome}</p>
+        ) : null}
         {error ? (
           <p className={`mb-4 ${errorClass}`}>{error}</p>
         ) : preparingQuiz ? (
